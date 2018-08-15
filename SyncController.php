@@ -1,4 +1,21 @@
 <?php
+#ON 172.16.2.141 MASTER SERVER
+#GENERATE KEYS FOR ROOT USER
+#sudo su
+#cd ~/.ssh
+#ssh-keygen -f ~/.ssh/id_rsa -q -P ""
+#COPY ID TO DESTINATION SERVER
+#ssh-copy-id c1n-pk@172.16.2.142
+#NOW YOU CAN RSYNC AS ROOT USER TO OTHER SERVERS
+#BUT WE HAVE TO GIVE WWW-DATA RIGHTS TO CALL THIS SCRIPT AND ONLY THIS SCRIPT
+#sudo visudo
+#ADD THIS LINE
+#www-data ALL=(ALL) NOPASSWD:/var/www/scripts/rsync.php
+#MAY NEED TO EDIT /etc/passwd TO ALLOW su www-data TO TEST BUT MAKE SURE TO RETURN TO nologin
+#MAKE SURE /var/www/scripts/rsync.php EXISTS AND CONTAINS RSYNC CODE PHP ZEND CONTROLLER WILL CALL INTO THIS TO RUN SYNC
+#THE ABOVE IS SAFE BECAUSE www-data ONLY HAS RIGHTS TO EXECUTE ONE SCRIPT AND THERE ARE
+#NO GET PARAMETERS OR POST PARAMETERS DETERMINING INPUT FOR CLI SCRIPT
+
 class Admin_SyncController extends Zend_Controller_Action
 {
 	private static $_connection = null;
@@ -7,7 +24,7 @@ class Admin_SyncController extends Zend_Controller_Action
 	private static $_pwd = 'e&!Ep$TpeYq!5LEk';
 	private static $_copyList = [];
 	private static $_syncRecord = '';
-	private static $_lastSyncTime = null;
+	private static $_runTypeRsync = true;
 	private static $_remoteImagePath = null;
 	private static $_debug = false;
 
@@ -36,9 +53,10 @@ class Admin_SyncController extends Zend_Controller_Action
 		try {
 
 			self::$_debug = $this->getRequest()->getParam('debug',false) === 'true' ? true : false;
+			self::$_runTypeRsync = $this->getRequest()->getParam('runType',false) === 'rsync' ? true : true;
 
 			if (self::isMasterServer() === false) {
-				return $this->getResponse()->setRedirect('/admin');
+				return $this->getResponse()->setRedirect($this->getRequest()->getHeader('referer'));
 			}
 
 			#get list of local files to be sent
@@ -48,22 +66,29 @@ class Admin_SyncController extends Zend_Controller_Action
 
 				if(self::$_debug === true) echo "COPYING TO SERVER: " . $slave->get('host'). "<br>";
 
-				#reset the remote connection
-				self::getRemoteConnection($slave->get('host'), $forceNewHost = true);
+				if(self::$_runTypeRsync === true) {
 
-				#send the files
-				self::runSync($slave->get('image'));
+					self::runRsync($slave->get('user'),$slave->get('host'),$slave->get('image'));
+
+				} else {
+
+					#reset the remote connection
+					self::getRemoteConnection($slave->get('host'), $forceNewHost = true);
+
+					#send the files
+					self::runSync($slave->get('image'));
+				}
 
 			}
 
 			if(self::$_debug === true) exit;
 
-			return $this->getResponse()->setRedirect('/admin');
+			return $this->getResponse()->setRedirect($this->getRequest()->getHeader('referer'));
 
 		} catch(Exception $e) {
 
 			error_log($e->getMessage());
-			return $this->getResponse()->setRedirect('/admin');
+			return $this->getResponse()->setRedirect($this->getRequest()->getHeader('referer'));
 
 		}
 	}
@@ -80,6 +105,19 @@ class Admin_SyncController extends Zend_Controller_Action
 		self::$_loadBalancerConfig = $config->load_balancer;
 
 		return $_SERVER['SERVER_ADDR'] === $config->load_balancer->master->get('host');
+	}
+
+	public static function runRsync($user,$host,$remote)
+	{
+		$local = self::getLocalImagePath();
+		$command = 'sudo /var/www/scripts/rsync.php -l "'.$local.'/*" -u "'.$user.'" -h "'.$host.'" -r "'.$remote.'"';
+
+		if(self::$_debug === true) {
+			echo $command . "<br>";
+		} else {
+			$output = shell_exec($command);
+			return $output;
+		}
 	}
 
 	public static function runSync($remotePath)

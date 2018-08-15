@@ -119,7 +119,7 @@ class DeployManager
 	{
 		self::$_APPLICATION_PATH = getcwd() . '/';
 
-		self::$_options = getopt('h:e:s:d:');
+		self::$_options = getopt('h:e:s:d:a:');
 
 		$envs = self::getDeployEnv();
 
@@ -152,8 +152,15 @@ class DeployManager
 		echo "Thank you, deploying...";
 		echo "\n\n\n\n";
 
-		self::deployFiles();
+		//self::deployFiles();
 
+		if(isset(self::$_options['a'])) {
+
+			self::compileCustomAssets();
+
+			self::customAssetsRunRsync();
+
+		}
 	}
 
 	public static function deployFiles()
@@ -263,6 +270,62 @@ class DeployManager
 		$command = 'sshpass -p \'' . self::$_pwd . '\' ssh ' . self::$_user . '@' . $host . ' "cat ' . $remoteFile . '" | git diff "' . $localFile . '"';
 
 		return shell_exec($command);
+	}
+
+	public static function compileCustomAssets()
+	{
+		$command = 'cd ' . self::$_APPLICATION_PATH . 'custom_assets/ && gulp --production';
+
+		echo "Compiling custom asssets...\n\n\n\n";
+
+		echo shell_exec($command);
+	}
+
+	public static function iterateCustomDirectory($directory = null, $host, $path)
+	{
+		if($directory === null) {
+			$directory = self::getLocalImagePath();
+		}
+
+		foreach (glob("$directory/*") as $glib) {
+
+			if(preg_match('/node_modules|bower_components/',$glib) == 1) {
+				continue;
+			}
+
+			if (is_dir($glib) === true) {
+				self::iterateCustomDirectory($glib,$host,$path);
+				continue;
+			}
+
+			$newFile = preg_replace('#'.self::$_APPLICATION_PATH.'#',$path,$glib);
+
+			echo "Copying ". $glib . " => " . $newFile . "\n";
+
+			$success = self::copyLocalFileToRemote($glib,$newFile);
+
+			if ($success === true) {
+
+				echo "success\n";
+
+			} else {
+
+				echo "failure\n";
+
+			}
+		}
+	}
+
+	public static function customAssetsRunRsync()
+	{
+		$envs = self::getDeployEnv();
+
+		foreach ($envs as $host => $path) {
+
+			self::refreshRemoteConnection($host);
+
+			self::iterateCustomDirectory(self::$_APPLICATION_PATH . 'public/custom_assets',$host,$path);
+		}
 	}
 }
 
