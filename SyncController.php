@@ -10,7 +10,7 @@
 #BUT WE HAVE TO GIVE WWW-DATA RIGHTS TO CALL THIS SCRIPT AND ONLY THIS SCRIPT
 #sudo visudo
 #ADD THIS LINE
-#www-data ALL=(ALL) NOPASSWD:/var/www/scripts/rsync.php
+#www-data ALL=(ALL) NOPASSWD:/var/www/scripts/rsync.php,/var/www/scripts/cache.php
 #MAY NEED TO EDIT /etc/passwd TO ALLOW su www-data TO TEST BUT MAKE SURE TO RETURN TO nologin
 #MAKE SURE /var/www/scripts/rsync.php EXISTS AND CONTAINS RSYNC CODE PHP ZEND CONTROLLER WILL CALL INTO THIS TO RUN SYNC
 #THE ABOVE IS SAFE BECAUSE www-data ONLY HAS RIGHTS TO EXECUTE ONE SCRIPT AND THERE ARE
@@ -46,13 +46,42 @@ class Admin_SyncController extends Zend_Controller_Action
 			$auth->clearIdentity();
 			Cny_Auth::storeRequestAndAuthenticateUser();
 		}
+
+		self::$_debug = $this->getRequest()->getParam('debug',false) === 'true' ? true : false;
+
+		if (self::isMasterServer() === false) {
+			return $this->getResponse()->setRedirect($this->getRequest()->getHeader('referer'));
+		}
+	}
+
+	public function cacheAction()
+	{
+		try {
+			foreach (self::$_loadBalancerConfig->slaves as $slave) {
+
+				$command = ('sudo /var/www/scripts/cache.php ' . '-c "' . $slave->get('cache') . '" -u "' . $slave->get('user') . '" -h "' . $slave->get('host') . '"');
+
+				$output = shell_exec($command);
+
+				if (self::$_debug === true) echo $command . " => " . $output . "<br>";
+
+			}
+		} catch(Exception $e) {
+
+			error_log($e->getMessage());
+			return $this->getResponse()->setRedirect($this->getRequest()->getHeader('referer'));
+
+		}
+
+		if(self::$_debug === true) exit;
+
+		return $this->getResponse()->setRedirect($this->getRequest()->getHeader('referer'));
 	}
 
 	public function imagesAction()
 	{
 		try {
 
-			self::$_debug = $this->getRequest()->getParam('debug',false) === 'true' ? true : false;
 			self::$_runTypeRsync = $this->getRequest()->getParam('runType',false) === 'rsync' ? true : true;
 
 			if (self::isMasterServer() === false) {

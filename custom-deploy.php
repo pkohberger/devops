@@ -152,7 +152,7 @@ class DeployManager
 		echo "Thank you, deploying...";
 		echo "\n\n\n\n";
 
-		//self::deployFiles();
+		self::deployFiles();
 
 		if(isset(self::$_options['a'])) {
 
@@ -267,7 +267,7 @@ class DeployManager
 	{
 		echo "Running diff on following files: $remoteFile => $localFile \n\n";
 
-		$command = 'sshpass -p \'' . self::$_pwd . '\' ssh ' . self::$_user . '@' . $host . ' "cat ' . $remoteFile . '" | git diff "' . $localFile . '"';
+		$command = 'sshpass -p \'' . self::$_pwd . '\' scp ' . self::$_user . '@' . $host . ':' . $remoteFile . ' /tmp/diff.txt && colordiff /tmp/diff.txt "' . $localFile . '" --ignore-space-change --ignore-blank-lines';
 
 		return shell_exec($command);
 	}
