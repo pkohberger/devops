@@ -27,6 +27,7 @@ class Admin_SyncController extends Zend_Controller_Action
 	private static $_runTypeRsync = true;
 	private static $_remoteImagePath = null;
 	private static $_debug = false;
+	private static $_hmac = '';
 
 	public function init()
 	{
@@ -52,14 +53,41 @@ class Admin_SyncController extends Zend_Controller_Action
 		if (self::isMasterServer() === false) {
 			return $this->getResponse()->setRedirect($this->getRequest()->getHeader('referer'));
 		}
+
+		self::$_hmac = hash_hmac(
+			"sha256",
+			"MpkXasfVVvpBCXKRJsVBNkzUhuBb7cHm4hCPsr6C29Zk8",
+			"TjfDtNWX7VEWd3K2k7MzkpkmU7TDnLF2zQ8C9aedxCPMfzKG8xW2NwTBk3PEAcyzBb4DLcwb8bweAEmeDMVfeZYGYYL2bav6B4kvKUhJCxusKgWTtMvQvgAnDww5kfJ52nteLYH3QXVquxLUJcjwudkEfe4XWb",
+			false
+		);
+
 	}
 
 	public function cacheAction()
 	{
 		try {
+
+			$options = new Zend_Config_Ini(realpath(APPLICATION_PATH.'/configs/application.ini'), APPLICATION_ENV);
+
+			$cacheDir = $options->get('dir')->get('cache');
+
+			if($cacheDir === null) {
+				return $this->getResponse()->setRedirect($this->getRequest()->getHeader('referer'));
+			}
+
+			$cache = Zend_Cache::factory(
+				'Core',
+				'File',
+				['automatic_serialization' => true, 'lifetime' => 0],
+				['cache_dir' => $cacheDir]
+			);
+
+			$cache->clean(Zend_Cache::CLEANING_MODE_ALL);
+
+
 			foreach (self::$_loadBalancerConfig->slaves as $slave) {
 
-				$command = ('sudo /var/www/scripts/cache.php ' . '-c "' . $slave->get('cache') . '" -u "' . $slave->get('user') . '" -h "' . $slave->get('host') . '"');
+				$command = ('sudo /var/www/scripts/cache.php ' . '-c "' . $slave->get('cache') . '" -u "' . $slave->get('user') . '" -h "' . $slave->get('host') . '" -k "' . self::$_hmac . '"');
 
 				$output = shell_exec($command);
 
@@ -139,7 +167,7 @@ class Admin_SyncController extends Zend_Controller_Action
 	public static function runRsync($user,$host,$remote)
 	{
 		$local = self::getLocalImagePath();
-		$command = 'sudo /var/www/scripts/rsync.php -l "'.$local.'/*" -u "'.$user.'" -h "'.$host.'" -r "'.$remote.'"';
+		$command = 'sudo /var/www/scripts/rsync.php -l "'.$local.'/*" -u "'.$user.'" -h "'.$host.'" -r "'.$remote . '" -k "' . self::$_hmac . '"';
 
 		if(self::$_debug === true) {
 			echo $command . "<br>";
