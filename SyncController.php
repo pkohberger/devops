@@ -5,7 +5,7 @@
 #cd ~/.ssh
 #ssh-keygen -f ~/.ssh/id_rsa -q -P ""
 #COPY ID TO DESTINATION SERVER
-#ssh-copy-id c1n-pk@172.16.2.142
+#ssh-copy-id c1n-deploy@172.16.2.36 && ssh-copy-id c1n-deploy@172.16.2.48
 #NOW YOU CAN RSYNC AS ROOT USER TO OTHER SERVERS
 #BUT WE HAVE TO GIVE WWW-DATA RIGHTS TO CALL THIS SCRIPT AND ONLY THIS SCRIPT
 #sudo visudo
@@ -16,12 +16,12 @@
 #THE ABOVE IS SAFE BECAUSE www-data ONLY HAS RIGHTS TO EXECUTE ONE SCRIPT AND THERE ARE
 #NO GET PARAMETERS OR POST PARAMETERS DETERMINING INPUT FOR CLI SCRIPT
 
-class Admin_SyncController extends Zend_Controller_Action
+class Admin_CrpsyncController extends Zend_Controller_Action
 {
 	private static $_connection = null;
 	private static $_loadBalancerConfig = null;
-	private static $_user = 'c1n-pk';
-	private static $_pwd = 'e&!Ep$TpeYq!5LEk';
+	private static $_user = 'c1n-deploy';
+	private static $_pwd = 'creepers78Win52piano';
 	private static $_copyList = [];
 	private static $_syncRecord = '';
 	private static $_runTypeRsync = true;

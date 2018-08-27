@@ -33,3 +33,4 @@ if($options['k'] !== $hMac) {
 $command = ('ssh ' . $options['u'] . '@' . $options['h'] . ' ' . $options['c'] . '/scripts/cache.php');
 
 shell_exec($command);
+

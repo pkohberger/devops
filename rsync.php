@@ -1,4 +1,4 @@
-#!/usr/bin/php 
+#!/usr/bin/php
 <?php
 
 $options = getopt('l:u:h:r:k:');
@@ -20,7 +20,7 @@ if(!isset($options['r']) || trim($options['r']) === '') {
 }
 
 if(!isset($options['k']) || trim($options['k']) === '') {
-        exit;
+	exit;
 }
 
 $hMac = hash_hmac(
@@ -37,10 +37,8 @@ if($options['k'] !== $hMac) {
 $cleanLocal = preg_replace('/[^A-Za-z0-9]+/','',$options['l']);
 $cleanRemote = preg_replace('/[^A-Za-z0-9]+/','',$options['r']);
 
-if($cleanLocal === $cleanRemote) {
+if($cleanLocal === $cleanRemote && preg_match('#varwwwcentral#',$cleanRemote) === 1) {
 
 	$command = 'rsync -crog ' . $options['l'] . ' ' . $options['u'] . '@' . $options['h'] . ':' . $options['r'] . ' --delete';
 	shell_exec($command);
 }
-
-
